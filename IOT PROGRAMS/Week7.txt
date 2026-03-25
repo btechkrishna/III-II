@@ -1,0 +1,64 @@
+#include <ESP8266WiFi.h>
+#include <DHT.h>
+
+const char* ssid = "your_wifi_name";
+const char* password = "your_password";
+
+String apiKey = "YOUR_API_KEY";
+const char* server = "api.thingspeak.com";
+
+#define DHTPIN D3
+#define DHTTYPE DHT11
+
+DHT dht(DHTPIN, DHTTYPE);
+WiFiClient client;
+
+void setup() {
+  Serial.begin(115200);
+  dht.begin();
+
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("WiFi connected");
+}
+
+void loop() {
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+
+  if (isnan(h) || isnan(t)) {
+    Serial.println("Sensor Error");
+    return;
+  }
+
+  if (client.connect(server, 80)) {
+
+    String postStr = apiKey;
+    postStr += "&field1=" + String(t);
+    postStr += "&field2=" + String(h);
+    postStr += "\r\n\r\n";
+
+    client.print("POST /update HTTP/1.1\n");
+    client.print("Host: api.thingspeak.com\n");
+    client.print("Connection: close\n");
+    client.print("X-THINGSPEAKAPIKEY: " + apiKey + "\n");
+    client.print("Content-Type: application/x-www-form-urlencoded\n");
+    client.print("Content-Length: ");
+    client.print(postStr.length());
+    client.print("\n\n");
+    client.print(postStr);
+
+    Serial.print("Temp: ");
+    Serial.print(t);
+    Serial.print(" °C  Humidity: ");
+    Serial.println(h);
+  }
+
+  client.stop();
+  delay(15000);
+}
